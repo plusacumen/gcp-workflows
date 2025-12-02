@@ -127,8 +127,8 @@ jobs:
 
       - name: Configure Git to use GitHub token for private repos
         run: |
-          git config --global url."https://${GH_TOKEN}@github.com/".insteadOf "ssh://git@github.com/"
-          git config --global url."https://${GH_TOKEN}@github.com/".insteadOf "git@github.com:"
+          git config --global url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "ssh://git@github.com"
+          git config --global url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "git@github.com:"
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
@@ -171,8 +171,8 @@ jobs:
 
       - name: Configure Git to use GitHub token for private repos
         run: |
-          git config --global url."https://${GH_TOKEN}@github.com/".insteadOf "ssh://git@github.com/"
-          git config --global url."https://${GH_TOKEN}@github.com/".insteadOf "git@github.com:"
+          git config --global url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "ssh://git@github.com"
+          git config --global url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "git@github.com:"
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
@@ -233,7 +233,6 @@ jobs:
           git push || true
 
   semantic-release:
-    # Mirror CircleCI: only release after tests & (optionally) SAST succeed
     if: |
       inputs.run-semantic-release &&
       (inputs.run-unit-tests == false || needs.unit-test.result == 'success') &&
@@ -258,8 +257,8 @@ jobs:
 
       - name: Configure Git to use GitHub token for private repos
         run: |
-          git config --global url."https://${GH_TOKEN}@github.com/".insteadOf "ssh://git@github.com/"
-          git config --global url."https://${GH_TOKEN}@github.com/".insteadOf "git@github.com:"
+          git config --global url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "ssh://git@github.com"
+          git config --global url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "git@github.com:"
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
