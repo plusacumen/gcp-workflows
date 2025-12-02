@@ -1,343 +1,352 @@
 name: Deploy to GCP Cloud Run
 
 on:
-    workflow_call:
-        inputs:
-            env-prefix:
-                description: "Environment prefix (ST_ for staging, empty for production)"
-                required: false
-                type: string
-                default: ""
-            working-dir:
-                description: "Working directory for commands"
-                required: false
-                type: string
-                default: "."
-            image-name:
-                description: "Docker image name (should match Cloud Run service name)"
-                required: true
-                type: string
-            regions:
-                description: "Comma-separated list of GCP regions"
-                required: true
-                type: string
-            node-version:
-                description: "Node.js version to use"
-                required: false
-                type: string
-                default: "20"
-            port:
-                description: "Container port"
-                required: false
-                type: number
-                default: 8080
-            run-unit-tests:
-                description: "Whether to run unit tests"
-                required: false
-                type: boolean
-                default: true
-            run-sast:
-                description: "Whether to run SAST/SCA scanning"
-                required: false
-                type: boolean
-                default: true
-            run-semantic-release:
-                description: "Whether to run semantic release"
-                required: false
-                type: boolean
-                default: true
-            build-args:
-                description: "Additional Docker build arguments"
-                required: false
-                type: string
-                default: ""
-            test-command:
-                description: "Command to run tests"
-                required: false
-                type: string
-                default: "npm run test"
-            install-command:
-                description: "Command to install dependencies"
-                required: false
-                type: string
-                default: "npm install"
-            build-command:
-                description: "Command to build project"
-                required: false
-                type: string
-                default: "npm run build"
-            needs-build:
-                description: "Whether project needs build step before tests"
-                required: false
-                type: boolean
-                default: false
-            veracode-baseline-file:
-                description: "Veracode baseline filename"
-                required: false
-                type: string
-                default: "veracode-base.json"
-            veracode-exclude-files:
-                description: "Files to exclude from Veracode scan"
-                required: false
-                type: string
-                default: "test/* tests/* node_modules/* .git/*"
-        secrets:
-            GCLOUD_AUTH_KEY:
-                description: "GCP service account JSON key"
-                required: true
-            FB_PROJECT_ID:
-                description: "Firebase/GCP Project ID"
-                required: true
-            GH_TOKEN:
-                description: "GitHub token for semantic-release"
-                required: false
-            VERACODE_API_ID:
-                description: "Veracode API ID for security scanning"
-                required: false
-            VERACODE_API_KEY:
-                description: "Veracode API key for security scanning"
-                required: false
-            NPM_TOKEN:
-                description: "NPM authentication token"
-                required: false
-        outputs:
-            version:
-                description: "The deployed version"
-                value: ${{ jobs.semantic-release.outputs.version }}
+  workflow_call:
+    inputs:
+      working-dir:
+        description: "Working directory for commands"
+        required: false
+        type: string
+        default: "."
+      image-name:
+        description: "Docker image name (must match Cloud Run service name)"
+        required: true
+        type: string
+      regions:
+        description: "Comma-separated list of GCP regions (e.g. 'europe-west1,us-central1')"
+        required: true
+        type: string
+      node-version:
+        description: "Node.js version to use"
+        required: false
+        type: string
+        default: "20"
+      port:
+        description: "Container port"
+        required: false
+        type: number
+        default: 8080
+      run-unit-tests:
+        description: "Whether to run unit tests"
+        required: false
+        type: boolean
+        default: true
+      run-sast:
+        description: "Whether to run SAST/SCA scanning (Veracode)"
+        required: false
+        type: boolean
+        default: true
+      run-semantic-release:
+        description: "Whether to run semantic-release"
+        required: false
+        type: boolean
+        default: true
+      run-build-push:
+        description: "Whether to build & push the Docker image"
+        required: false
+        type: boolean
+        default: true
+      run-deploy:
+        description: "Whether to deploy to Cloud Run"
+        required: false
+        type: boolean
+        default: true
+      build-args:
+        description: "Additional Docker build arguments (passed to docker buildx)"
+        required: false
+        type: string
+        default: ""
+      test-command:
+        description: "Command to run tests"
+        required: false
+        type: string
+        default: "npm run test"
+      install-command:
+        description: "Command to install dependencies"
+        required: false
+        type: string
+        default: "npm install"
+      build-command:
+        description: "Command to build project"
+        required: false
+        type: string
+        default: "npm run build"
+      needs-build:
+        description: "Whether project needs a build step before tests"
+        required: false
+        type: boolean
+        default: false
+      veracode-baseline-file:
+        description: "Veracode baseline filename"
+        required: false
+        type: string
+        default: "veracode-base.json"
+      veracode-exclude-files:
+        description: "Files to exclude from Veracode scan (space-separated patterns)"
+        required: false
+        type: string
+        default: "test/* tests/* node_modules/* .git/*"
+    secrets:
+      GCLOUD_AUTH_KEY:
+        description: "GCP service account JSON key"
+        required: true
+      FB_PROJECT_ID:
+        description: "Firebase/GCP Project ID"
+        required: true
+      GH_TOKEN:
+        description: "GitHub token for semantic-release / commits"
+        required: false
+      VERACODE_API_ID:
+        description: "Veracode API ID for security scanning"
+        required: false
+      VERACODE_API_KEY:
+        description: "Veracode API key for security scanning"
+        required: false
+      NPM_TOKEN:
+        description: "NPM authentication token"
+        required: false
+    outputs:
+      version:
+        description: "Semantic-release version (empty if not run)"
+        value: ${{ jobs.semantic-release.outputs.version }}
 
 jobs:
-    unit-test:
-        if: inputs.run-unit-tests
-        runs-on: ubuntu-latest
-        defaults:
-            run:
-                working-directory: ${{ inputs.working-dir }}
-        steps:
-            - uses: actions/checkout@v4
+  unit-test:
+    if: inputs.run-unit-tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-dir }}
+    steps:
+      - uses: actions/checkout@v4
 
-            - name: Setup Node.js
-              uses: actions/setup-node@v4
-              with:
-                  node-version: ${{ inputs.node-version }}
-                  cache: "npm"
-                  cache-dependency-path: ${{ inputs.working-dir }}/package-lock.json
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: "npm"
+          cache-dependency-path: ${{ inputs.working-dir }}/package-lock.json
 
-            - name: Configure npm
-              run: |
-                  if [ -n "${{ secrets.NPM_TOKEN }}" ]; then
-                    echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
-                  fi
+      - name: Configure npm auth
+        run: |
+          if [ -n "${{ secrets.NPM_TOKEN }}" ]; then
+            echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
+          fi
 
-            - name: Install dependencies
-              run: ${{ inputs.install-command }}
+      - name: Install dependencies
+        run: ${{ inputs.install-command }}
 
-            - name: Build
-              if: inputs.needs-build
-              run: ${{ inputs.build-command }}
+      - name: Build
+        if: inputs.needs-build
+        run: ${{ inputs.build-command }}
 
-            - name: Run tests
-              run: ${{ inputs.test-command }}
+      - name: Run tests
+        run: ${{ inputs.test-command }}
 
-    sast-scan:
-        if: inputs.run-sast
-        runs-on: ubuntu-latest
-        needs: unit-test
-        defaults:
-            run:
-                working-directory: ${{ inputs.working-dir }}
-        steps:
-            - uses: actions/checkout@v4
-              with:
-                  token: ${{ secrets.GH_TOKEN || github.token }}
-                  fetch-depth: 0
+  sast-scan:
+    if: inputs.run-sast
+    runs-on: ubuntu-latest
+    needs: unit-test
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-dir }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_TOKEN || github.token }}
+          fetch-depth: 0
 
-            - name: Setup Node.js
-              uses: actions/setup-node@v4
-              with:
-                  node-version: ${{ inputs.node-version }}
-                  cache: "npm"
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: "npm"
 
-            - name: Install dependencies
-              run: ${{ inputs.install-command }}
+      - name: Install dependencies
+        run: ${{ inputs.install-command }}
 
-            - name: Build
-              if: inputs.needs-build
-              run: ${{ inputs.build-command }}
+      - name: Build
+        if: inputs.needs-build
+        run: ${{ inputs.build-command }}
 
-            - name: Check Veracode credentials
-              id: check-veracode
-              run: |
-                  if [ -n "${{ secrets.VERACODE_API_ID }}" ] && [ -n "${{ secrets.VERACODE_API_KEY }}" ]; then
-                    echo "has-credentials=true" >> $GITHUB_OUTPUT
-                  else
-                    echo "has-credentials=false" >> $GITHUB_OUTPUT
-                  fi
+      - name: Check Veracode credentials
+        id: check-veracode
+        run: |
+          if [ -n "${{ secrets.VERACODE_API_ID }}" ] && [ -n "${{ secrets.VERACODE_API_KEY }}" ]; then
+            echo "has-credentials=true" >> $GITHUB_OUTPUT
+          else
+            echo "has-credentials=false" >> $GITHUB_OUTPUT
+          fi
 
-            - name: Download Veracode Pipeline Scan
-              if: steps.check-veracode.outputs.has-credentials == 'true'
-              run: |
-                  curl -O https://downloads.veracode.com/securityscan/pipeline-scan-LATEST.zip
-                  unzip pipeline-scan-LATEST.zip pipeline-scan.jar
+      - name: Download Veracode Pipeline Scan
+        if: steps.check-veracode.outputs.has-credentials == 'true'
+        run: |
+          curl -O https://downloads.veracode.com/securityscan/pipeline-scan-LATEST.zip
+          unzip pipeline-scan-LATEST.zip pipeline-scan.jar
 
-            - name: Zip code for scanning
-              if: steps.check-veracode.outputs.has-credentials == 'true'
-              run: zip -r acumenacademy.zip . -x ${{ inputs.veracode-exclude-files }}
+      - name: Zip code for scanning
+        if: steps.check-veracode.outputs.has-credentials == 'true'
+        run: zip -r acumenacademy.zip . -x ${{ inputs.veracode-exclude-files }}
 
-            - name: Run Veracode Pipeline Scan
-              if: steps.check-veracode.outputs.has-credentials == 'true'
-              run: |
-                  java -jar pipeline-scan.jar \
-                    -vid ${{ secrets.VERACODE_API_ID }} \
-                    -vkey ${{ secrets.VERACODE_API_KEY }} \
-                    --file acumenacademy.zip \
-                    --baseline_file ${{ inputs.veracode-baseline-file }} \
-                    --json_output_file="${{ inputs.veracode-baseline-file }}"
-              continue-on-error: true
+      - name: Run Veracode Pipeline Scan
+        if: steps.check-veracode.outputs.has-credentials == 'true'
+        run: |
+          java -jar pipeline-scan.jar \
+            -vid ${{ secrets.VERACODE_API_ID }} \
+            -vkey ${{ secrets.VERACODE_API_KEY }} \
+            --file acumenacademy.zip \
+            --baseline_file ${{ inputs.veracode-baseline-file }} \
+            --json_output_file="${{ inputs.veracode-baseline-file }}"
+        continue-on-error: true
 
-            - name: Run Veracode SCA Scan
-              if: steps.check-veracode.outputs.has-credentials == 'true'
-              run: curl -sSL https://download.sourceclear.com/ci.sh | sh
-              env:
-                  SRCCLR_API_TOKEN: ${{ secrets.VERACODE_API_KEY }}
-              continue-on-error: true
+      - name: Run Veracode SCA Scan
+        if: steps.check-veracode.outputs.has-credentials == 'true'
+        run: curl -sSL https://download.sourceclear.com/ci.sh | sh
+        env:
+          SRCCLR_API_TOKEN: ${{ secrets.VERACODE_API_KEY }}
+        continue-on-error: true
 
-            - name: Commit baseline file
-              if: github.ref == 'refs/heads/development' || github.ref == 'refs/heads/main'
-              run: |
-                  git config user.email "bot@plusacumen.com"
-                  git config user.name "aa-bot"
-                  git add ${{ inputs.veracode-baseline-file }} || true
-                  git diff --staged --quiet || git commit -m "sast: baseline updated [skip ci]"
-                  git push || true
+      - name: Commit baseline file
+        if: (github.ref == 'refs/heads/development' || github.ref == 'refs/heads/master') && steps.check-veracode.outputs.has-credentials == 'true'
+        run: |
+          git config user.email "bot@plusacumen.com"
+          git config user.name "aa-bot"
+          git add ${{ inputs.veracode-baseline-file }} || true
+          git diff --staged --quiet || git commit -m "sast: baseline updated [skip ci]"
+          git push || true
 
-    semantic-release:
-        if: inputs.run-semantic-release && (inputs.run-unit-tests == false || needs.unit-test.result == 'success')
-        runs-on: ubuntu-latest
-        needs: [unit-test]
-        outputs:
-            version: ${{ steps.get-version.outputs.version }}
-        defaults:
-            run:
-                working-directory: ${{ inputs.working-dir }}
-        steps:
-            - uses: actions/checkout@v4
-              with:
-                  fetch-depth: 0
-                  token: ${{ secrets.GH_TOKEN || github.token }}
+  semantic-release:
+    # Mirror CircleCI: only release after tests & (optionally) SAST succeed
+    if: |
+      inputs.run-semantic-release &&
+      (inputs.run-unit-tests == false || needs.unit-test.result == 'success') &&
+      (inputs.run-sast == false || needs.sast-scan.result == 'success')
+    runs-on: ubuntu-latest
+    needs: [unit-test, sast-scan]
+    outputs:
+      version: ${{ steps.get-version.outputs.version }}
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-dir }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GH_TOKEN || github.token }}
 
-            - name: Setup Node.js
-              uses: actions/setup-node@v4
-              with:
-                  node-version: ${{ inputs.node-version }}
-                  cache: "npm"
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: "npm"
 
-            - name: Install dependencies
-              run: npm install
+      - name: Install dependencies
+        run: npm install
 
-            - name: Release version
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GH_TOKEN || github.token }}
-                  GIT_AUTHOR_NAME: aa-bot
-                  GIT_AUTHOR_EMAIL: bot@plusacumen.com
-                  GIT_COMMITTER_NAME: aa-bot
-                  GIT_COMMITTER_EMAIL: bot@plusacumen.com
-              run: npx semantic-release@19
+      - name: Release version
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN || github.token }}
+          GIT_AUTHOR_NAME: aa-bot
+          GIT_AUTHOR_EMAIL: bot@plusacumen.com
+          GIT_COMMITTER_NAME: aa-bot
+          GIT_COMMITTER_EMAIL: bot@plusacumen.com
+        run: npx semantic-release@19
 
-            - name: Read version
-              id: get-version
-              run: |
-                  if [ -f static/version.json ]; then
-                    VERSION=$(cat static/version.json | jq -r '.version[-1].AA_VERSION')
-                    echo "version=$VERSION" >> $GITHUB_OUTPUT
-                  else
-                    echo "version=latest" >> $GITHUB_OUTPUT
-                  fi
+      - name: Read version
+        id: get-version
+        run: |
+          if [ -f static/version.json ]; then
+            VERSION=$(cat static/version.json | jq -r '.version[-1].AA_VERSION')
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+          else
+            echo "version=latest" >> $GITHUB_OUTPUT
+          fi
 
-            - name: Upload version artifacts
-              uses: actions/upload-artifact@v4
-              with:
-                  name: version-files
-                  path: ${{ inputs.working-dir }}/static/version.json
-                  retention-days: 1
-                  if-no-files-found: ignore
+      - name: Upload version artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: version-files
+          path: ${{ inputs.working-dir }}/static/version.json
+          retention-days: 1
+          if-no-files-found: ignore
 
-    build-push:
-        runs-on: ubuntu-latest
-        needs: [semantic-release]
-        if: always() && (needs.semantic-release.result == 'success' || needs.semantic-release.result == 'skipped')
-        defaults:
-            run:
-                working-directory: ${{ inputs.working-dir }}
-        steps:
-            - uses: actions/checkout@v4
+  build-push:
+    runs-on: ubuntu-latest
+    needs: [semantic-release]
+    if: inputs.run-build-push && always() && (needs.semantic-release.result == 'success' || needs.semantic-release.result == 'skipped')
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-dir }}
+    steps:
+      - uses: actions/checkout@v4
 
-            - name: Download version artifacts
-              if: inputs.run-semantic-release
-              uses: actions/download-artifact@v4
-              with:
-                  name: version-files
-                  path: ${{ inputs.working-dir }}/static/
-              continue-on-error: true
+      - name: Download version artifacts
+        if: inputs.run-semantic-release
+        uses: actions/download-artifact@v4
+        with:
+          name: version-files
+          path: ${{ inputs.working-dir }}/static/
+        continue-on-error: true
 
-            - name: Authenticate to Google Cloud
-              uses: google-github-actions/auth@v2
-              with:
-                  credentials_json: ${{ secrets.GCLOUD_AUTH_KEY }}
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCLOUD_AUTH_KEY }}
 
-            - name: Set up Cloud SDK
-              uses: google-github-actions/setup-gcloud@v2
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
 
-            - name: Configure Docker for Artifact Registry
-              run: gcloud auth configure-docker us-docker.pkg.dev
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker us-docker.pkg.dev
 
-            - name: Set up Docker Buildx
-              uses: docker/setup-buildx-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-            - name: Build and push Docker image
-              env:
-                  PROJECT_ID: ${{ secrets.FB_PROJECT_ID }}
-                  IMAGE_NAME: ${{ inputs.image-name }}
-                  VERSION: ${{ needs.semantic-release.outputs.version || 'latest' }}
-              run: |
-                  IMAGE_PATH="us-docker.pkg.dev/${PROJECT_ID}/gcr.io/${IMAGE_NAME}"
+      - name: Build and push Docker image
+        env:
+          PROJECT_ID: ${{ secrets.FB_PROJECT_ID }}
+          IMAGE_NAME: ${{ inputs.image-name }}
+          VERSION: ${{ needs.semantic-release.outputs.version || 'latest' }}
+        run: |
+          IMAGE_PATH="us-docker.pkg.dev/${PROJECT_ID}/gcr.io/${IMAGE_NAME}"
 
-                  docker buildx build \
-                    ${{ inputs.build-args }} \
-                    --cache-from type=registry,ref=${IMAGE_PATH}:cache \
-                    --cache-to type=registry,ref=${IMAGE_PATH}:cache,mode=max \
-                    -t ${IMAGE_PATH}:${VERSION} \
-                    -t ${IMAGE_PATH}:latest \
-                    --push \
-                    .
+          docker buildx build \
+            ${{ inputs.build-args }} \
+            --cache-from type=registry,ref=${IMAGE_PATH}:cache \
+            --cache-to type=registry,ref=${IMAGE_PATH}:cache,mode=max \
+            -t ${IMAGE_PATH}:${VERSION} \
+            -t ${IMAGE_PATH}:latest \
+            --push \
+            .
 
-    deploy:
-        runs-on: ubuntu-latest
-        needs: [build-push, semantic-release]
-        if: always() && needs.build-push.result == 'success'
-        steps:
-            - name: Authenticate to Google Cloud
-              uses: google-github-actions/auth@v2
-              with:
-                  credentials_json: ${{ secrets.GCLOUD_AUTH_KEY }}
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [build-push, semantic-release]
+    if: inputs.run-deploy && always() && needs.build-push.result == 'success'
+    steps:
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCLOUD_AUTH_KEY }}
 
-            - name: Set up Cloud SDK
-              uses: google-github-actions/setup-gcloud@v2
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
 
-            - name: Deploy to Cloud Run
-              env:
-                  PROJECT_ID: ${{ secrets.FB_PROJECT_ID }}
-                  IMAGE_NAME: ${{ inputs.image-name }}
-                  VERSION: ${{ needs.semantic-release.outputs.version || 'latest' }}
-              run: |
-                  IMAGE_PATH="us-docker.pkg.dev/${PROJECT_ID}/gcr.io/${IMAGE_NAME}:${VERSION}"
+      - name: Deploy to Cloud Run
+        env:
+          PROJECT_ID: ${{ secrets.FB_PROJECT_ID }}
+          IMAGE_NAME: ${{ inputs.image-name }}
+          VERSION: ${{ needs.semantic-release.outputs.version || 'latest' }}
+        run: |
+          IMAGE_PATH="us-docker.pkg.dev/${PROJECT_ID}/gcr.io/${IMAGE_NAME}:${VERSION}"
 
-                  IFS=',' read -ra REGIONS_ARRAY <<< "${{ inputs.regions }}"
-                  for region in "${REGIONS_ARRAY[@]}"; do
-                    echo "Deploying to region: ${region}"
-                    gcloud run deploy ${IMAGE_NAME} \
-                      --image ${IMAGE_PATH} \
-                      --allow-unauthenticated \
-                      --region=${region} \
-                      --port ${{ inputs.port }} \
-                      --quiet
-                  done
+          IFS=',' read -ra REGIONS_ARRAY <<< "${{ inputs.regions }}"
+          for region in "${REGIONS_ARRAY[@]}"; do
+            echo "Deploying to region: ${region}"
+            gcloud run deploy ${IMAGE_NAME} \
+              --image ${IMAGE_PATH} \
+              --allow-unauthenticated \
+              --region=${region} \
+              --port ${{ inputs.port }} \
+              --quiet
+          done
