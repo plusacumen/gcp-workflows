@@ -105,6 +105,9 @@ on:
       NPM_TOKEN:
         description: "NPM authentication token"
         required: false
+      SSH_PRIVATE_KEY:
+        description: "SSH Private Key for accessing private Git dependencies"
+        required: false
     outputs:
       version:
         description: "Semantic-release version (empty if not run)"
@@ -118,24 +121,25 @@ jobs:
       run:
         working-directory: ${{ inputs.working-dir }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Check SSH key availability
+        id: check-ssh-key
+        run: |
+          if [ -n "${{ secrets.SSH_PRIVATE_KEY }}" ]; then
+            echo "has-ssh-key=true" >> $GITHUB_OUTPUT
+          else
+            echo "has-ssh-key=false" >> $GITHUB_OUTPUT
+          fi
+      - name: Start SSH Agent for Private Git Access
+        if: steps.check-ssh-key.outputs.has-ssh-key == 'true'
+        uses: webfactory/ssh-agent@v0.9.1
         with:
-          token: ${{ secrets.GH_TOKEN || github.token }}
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+      - uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ inputs.node-version }}
-
-      - name: Configure Git to use GitHub token for private repos
-        run: |
-          git config --global url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "ssh://git@github.com"
-          git config --global url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "git@github.com:"
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-
-      - name: Debug git URL config
-        run: git config --global --get-regexp 'url\.https://.*github\.com/\.insteadOf' || echo "No url rewrite set"
 
       - name: Configure npm auth
         run: |
@@ -161,6 +165,19 @@ jobs:
       run:
         working-directory: ${{ inputs.working-dir }}
     steps:
+      - name: Check SSH key availability
+        id: check-ssh-key
+        run: |
+          if [ -n "${{ secrets.SSH_PRIVATE_KEY }}" ]; then
+            echo "has-ssh-key=true" >> $GITHUB_OUTPUT
+          else
+            echo "has-ssh-key=false" >> $GITHUB_OUTPUT
+          fi
+      - name: Start SSH Agent for Private Git Access
+        if: steps.check-ssh-key.outputs.has-ssh-key == 'true'
+        uses: webfactory/ssh-agent@v0.9.1
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
       - uses: actions/checkout@v4
         with:
           token: ${{ secrets.GH_TOKEN || github.token }}
@@ -170,16 +187,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ inputs.node-version }}
-
-      - name: Configure Git to use GitHub token for private repos
-        run: |
-          git config --global url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "ssh://git@github.com"
-          git config --global url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "git@github.com:"
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-
-      - name: Debug git URL config
-        run: git config --global --get-regexp 'url\.https://.*github\.com/\.insteadOf' || echo "No url rewrite set"
 
       - name: Install dependencies
         run: ${{ inputs.install-command }}
@@ -247,6 +254,19 @@ jobs:
       run:
         working-directory: ${{ inputs.working-dir }}
     steps:
+      - name: Check SSH key availability
+        id: check-ssh-key
+        run: |
+          if [ -n "${{ secrets.SSH_PRIVATE_KEY }}" ]; then
+            echo "has-ssh-key=true" >> $GITHUB_OUTPUT
+          else
+            echo "has-ssh-key=false" >> $GITHUB_OUTPUT
+          fi
+      - name: Start SSH Agent for Private Git Access
+        if: steps.check-ssh-key.outputs.has-ssh-key == 'true'
+        uses: webfactory/ssh-agent@v0.9.1
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -256,20 +276,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ inputs.node-version }}
-
-      - name: Configure Git Credentials with GH_TOKEN
-        run: git config --global url."https://${{ secrets.GH_TOKEN }}@github.com".insteadOf "https://github.com"
-
-      - name: Configure Git to use GitHub token for private repos
-        run: |
-          git config --global url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "ssh://git@github.com"
-          git config --global url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "git@github.com:"
-        env:
-          # Ensure GH_TOKEN is explicitly set in the environment for the Git command
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-
-      - name: Debug git URL config
-        run: git config --global --get-regexp 'url\.https://.*github\.com/\.insteadOf' || echo "No url rewrite set"
 
       - name: Install dependencies
         run: npm install
