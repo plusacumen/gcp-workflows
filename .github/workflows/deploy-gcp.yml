@@ -88,13 +88,13 @@ on:
         default: "test/* tests/* node_modules/* .git/*"
     secrets:
       GCLOUD_AUTH_KEY:
-        description: "GCP service account JSON key"
-        required: true
+        description: "GCP service account JSON key (required when run-build-push or run-deploy are true)"
+        required: false
       FB_PROJECT_ID:
-        description: "Firebase/GCP Project ID"
-        required: true
+        description: "Firebase/GCP Project ID (required when run-build-push or run-deploy are true)"
+        required: false
       GH_TOKEN:
-        description: "GitHub token for semantic-release / commits"
+        description: "GitHub token for semantic-release / commits / private dependencies"
         required: false
       VERACODE_API_ID:
         description: "Veracode API ID for security scanning"
@@ -124,6 +124,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ inputs.node-version }}
+
+      - name: Configure Git to use GitHub token for private repos
+        run: |
+          if [ -n "${{ secrets.GH_TOKEN }}" ]; then
+            git config --global url."https://${GH_TOKEN}@github.com/".insteadOf ssh://git@github.com/
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
       - name: Configure npm auth
         run: |
@@ -158,7 +166,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ inputs.node-version }}
-          cache: "npm"
+
+      - name: Configure Git to use GitHub token for private repos
+        run: |
+          if [ -n "${{ secrets.GH_TOKEN }}" ]; then
+            git config --global url."https://${GH_TOKEN}@github.com/".insteadOf ssh://git@github.com/
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
       - name: Install dependencies
         run: ${{ inputs.install-command }}
@@ -236,7 +251,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ inputs.node-version }}
-          cache: "npm"
+
+      - name: Configure Git to use GitHub token for private repos
+        run: |
+          if [ -n "${{ secrets.GH_TOKEN }}" ]; then
+            git config --global url."https://${GH_TOKEN}@github.com/".insteadOf ssh://git@github.com/
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
       - name: Install dependencies
         run: npm install
