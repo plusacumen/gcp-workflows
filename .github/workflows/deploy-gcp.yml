@@ -125,7 +125,6 @@ jobs:
         with:
           node-version: ${{ inputs.node-version }}
           cache: "npm"
-          cache-dependency-path: ${{ inputs.working-dir }}/package-lock.json
 
       - name: Configure npm auth
         run: |
