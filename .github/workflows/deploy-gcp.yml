@@ -127,11 +127,13 @@ jobs:
 
       - name: Configure Git to use GitHub token for private repos
         run: |
-          if [ -n "${{ secrets.GH_TOKEN }}" ]; then
-            git config --global url."https://${GH_TOKEN}@github.com/".insteadOf ssh://git@github.com/
-          fi
+          git config --global url."https://${GH_TOKEN}@github.com/".insteadOf "ssh://git@github.com/"
+          git config --global url."https://${GH_TOKEN}@github.com/".insteadOf "git@github.com:"
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      - name: Debug git URL config
+        run: git config --global --get-regexp 'url\.https://.*github\.com/\.insteadOf' || echo "No url rewrite set"
 
       - name: Configure npm auth
         run: |
@@ -169,11 +171,13 @@ jobs:
 
       - name: Configure Git to use GitHub token for private repos
         run: |
-          if [ -n "${{ secrets.GH_TOKEN }}" ]; then
-            git config --global url."https://${GH_TOKEN}@github.com/".insteadOf ssh://git@github.com/
-          fi
+          git config --global url."https://${GH_TOKEN}@github.com/".insteadOf "ssh://git@github.com/"
+          git config --global url."https://${GH_TOKEN}@github.com/".insteadOf "git@github.com:"
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      - name: Debug git URL config
+        run: git config --global --get-regexp 'url\.https://.*github\.com/\.insteadOf' || echo "No url rewrite set"
 
       - name: Install dependencies
         run: ${{ inputs.install-command }}
@@ -254,11 +258,13 @@ jobs:
 
       - name: Configure Git to use GitHub token for private repos
         run: |
-          if [ -n "${{ secrets.GH_TOKEN }}" ]; then
-            git config --global url."https://${GH_TOKEN}@github.com/".insteadOf ssh://git@github.com/
-          fi
+          git config --global url."https://${GH_TOKEN}@github.com/".insteadOf "ssh://git@github.com/"
+          git config --global url."https://${GH_TOKEN}@github.com/".insteadOf "git@github.com:"
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      - name: Debug git URL config
+        run: git config --global --get-regexp 'url\.https://.*github\.com/\.insteadOf' || echo "No url rewrite set"
 
       - name: Install dependencies
         run: npm install
