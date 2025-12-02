@@ -119,6 +119,8 @@ jobs:
         working-directory: ${{ inputs.working-dir }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_TOKEN || github.token }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -255,11 +257,15 @@ jobs:
         with:
           node-version: ${{ inputs.node-version }}
 
+      - name: Configure Git Credentials with GH_TOKEN
+        run: git config --global url."https://${{ secrets.GH_TOKEN }}@github.com".insteadOf "https://github.com"
+
       - name: Configure Git to use GitHub token for private repos
         run: |
           git config --global url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "ssh://git@github.com"
           git config --global url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "git@github.com:"
         env:
+          # Ensure GH_TOKEN is explicitly set in the environment for the Git command
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
       - name: Debug git URL config
