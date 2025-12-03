@@ -243,13 +243,9 @@ jobs:
           git push || true
 
   semantic-release:
-    if: |
-      inputs.run-semantic-release && (
-        (needs.unit-test.result == 'success' || needs.unit-test.result == 'skipped') &&
-        (needs.sast-scan.result == 'success' || needs.sast-scan.result == 'skipped')
-      )
+    # Now independent of unit-test / sast-scan inside this workflow
+    if: inputs.run-semantic-release
     runs-on: ubuntu-latest
-    needs: [unit-test, sast-scan]
     outputs:
       version: ${{ steps.get-version.outputs.version }}
     defaults:
