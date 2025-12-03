@@ -223,14 +223,12 @@ jobs:
             --file acumenacademy.zip \
             --baseline_file ${{ inputs.veracode-baseline-file }} \
             --json_output_file="${{ inputs.veracode-baseline-file }}"
-        continue-on-error: true
 
       - name: Run Veracode SCA Scan
         if: steps.check-veracode.outputs.has-credentials == 'true'
         run: curl -sSL https://download.sourceclear.com/ci.sh | sh
         env:
           SRCCLR_API_TOKEN: ${{ secrets.VERACODE_API_KEY }}
-        continue-on-error: true
 
       - name: Commit baseline file
         if: (github.ref == 'refs/heads/development' || github.ref == 'refs/heads/master') && steps.check-veracode.outputs.has-credentials == 'true'
@@ -323,7 +321,6 @@ jobs:
         with:
           name: version-files
           path: ${{ inputs.working-dir }}/static/
-        continue-on-error: true
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
