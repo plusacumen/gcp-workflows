@@ -315,6 +315,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check SSH key availability
+        id: check-ssh-key
+        run: |
+          if [ -n "${{ secrets.SSH_PRIVATE_KEY }}" ]; then
+            echo "has-ssh-key=true" >> $GITHUB_OUTPUT
+          else
+            echo "has-ssh-key=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Start SSH Agent for Private Git Access
+        if: steps.check-ssh-key.outputs.has-ssh-key == 'true'
+        uses: webfactory/ssh-agent@v0.9.1
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
       - name: Download version artifacts
         if: inputs.run-semantic-release
         uses: actions/download-artifact@v4
