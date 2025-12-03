@@ -244,9 +244,10 @@ jobs:
 
   semantic-release:
     if: |
-      inputs.run-semantic-release &&
-      (inputs.run-unit-tests == false || needs.unit-test.result == 'success') &&
-      (inputs.run-sast == false || needs.sast-scan.result == 'success')
+      inputs.run-semantic-release && (
+        (needs.unit-test.result == 'success' || needs.unit-test.result == 'skipped') &&
+        (needs.sast-scan.result == 'success' || needs.sast-scan.result == 'skipped')
+      )
     runs-on: ubuntu-latest
     needs: [unit-test, sast-scan]
     outputs:
