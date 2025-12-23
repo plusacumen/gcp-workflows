@@ -20,7 +20,7 @@ on:
         description: "Node.js version to use"
         required: false
         type: string
-        default: "20"
+        default: "25"
       port:
         description: "Container port"
         required: false
